@@ -51,7 +51,6 @@ function ExamView({ examId }: { examId: string }) {
       <div className="page-narrow">
         <h1>Exam not found</h1>
         <p>This exam link is missing or invalid. Ask your instructor for the full student URL.</p>
-        <Link to="/">Back to instructor page</Link>
       </div>
     )
   }
