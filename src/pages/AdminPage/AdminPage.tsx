@@ -8,6 +8,7 @@ import {
   studentKey,
 } from '../../services/examStorage'
 import type { GeneratedExam } from '../../types/exam'
+import { answerKeyPath, examSharePath, examShareUrl } from '../../utils/examLinks'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -74,6 +75,16 @@ export function AdminPage() {
     refresh()
   }
 
+  const handleCopyLink = async (exam: GeneratedExam) => {
+    const url = examShareUrl(exam)
+    try {
+      await navigator.clipboard.writeText(url)
+      setMessage(`Student link copied: ${url}`)
+    } catch {
+      setMessage(`Copy this student link: ${url}`)
+    }
+  }
+
   const activeName = resolveName()
   const activeExam = activeName ? exams[studentKey(activeName)] : undefined
 
@@ -126,28 +137,31 @@ export function AdminPage() {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => navigate(`/exam/${activeExam.examId}?preview=1`)}
+                  onClick={() => navigate(examSharePath(activeExam, { preview: '1' }))}
                 >
                   Preview
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => navigate(`/exam/${activeExam.examId}`)}
+                  onClick={() => navigate(examSharePath(activeExam))}
                 >
                   Open Student Exam View
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => handleCopyLink(activeExam)}>
+                  Copy student link
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => navigate(`/answer-key/${activeExam.examId}`)}
+                  onClick={() => navigate(answerKeyPath(activeExam))}
                 >
                   Answer Key
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => navigate(`/exam/${activeExam.examId}?preview=1&print=1`)}
+                  onClick={() => navigate(examSharePath(activeExam, { preview: '1', print: '1' }))}
                 >
                   Print / Save PDF
                 </button>
@@ -167,7 +181,8 @@ export function AdminPage() {
         {message ? <p className="notice">{message}</p> : null}
         <p className="hint">
           Replace names in <code>src/data/students.ts</code> with your real roster. Custom names typed
-          here are kept in this browser.
+          here are kept in this browser. Use <strong>Copy student link</strong> to share the exam — the
+          URL includes the student name so it works on Vercel and on the student’s device.
         </p>
       </section>
 
@@ -177,10 +192,11 @@ export function AdminPage() {
           students={students}
           exams={exams}
           onGenerate={handleGenerate}
-          onPreview={(examId) => navigate(`/exam/${examId}?preview=1`)}
-          onOpenExam={(examId) => navigate(`/exam/${examId}`)}
-          onAnswerKey={(examId) => navigate(`/answer-key/${examId}`)}
-          onPrint={(examId) => navigate(`/exam/${examId}?preview=1&print=1`)}
+          onPreview={(exam) => navigate(examSharePath(exam, { preview: '1' }))}
+          onOpenExam={(exam) => navigate(examSharePath(exam))}
+          onCopyLink={handleCopyLink}
+          onAnswerKey={(exam) => navigate(answerKeyPath(exam))}
+          onPrint={(exam) => navigate(examSharePath(exam, { preview: '1', print: '1' }))}
           onRegenerate={handleRegenerate}
         />
       </section>

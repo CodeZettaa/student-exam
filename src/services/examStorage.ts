@@ -1,4 +1,5 @@
 import { PREDEFINED_STUDENTS } from '../data/students'
+import { generateExam } from './examGenerator'
 import type { ExamAnswers, ExamTimerState, GeneratedExam } from '../types/exam'
 
 const STORAGE_KEY = 'js-diploma-exam-generator:v1'
@@ -56,6 +57,24 @@ export function getExamForStudent(name: string): GeneratedExam | undefined {
 export function getExamById(examId: string): GeneratedExam | undefined {
   const store = readStore()
   return Object.values(store.examsByStudent).find((exam) => exam.examId === examId)
+}
+
+export function resolveSharedExam(
+  examId: string,
+  studentName: string | null,
+  versionParam: string | null,
+): GeneratedExam | undefined {
+  const stored = getExamById(examId)
+  if (stored) return stored
+
+  const name = studentName?.trim()
+  const version = Number(versionParam)
+  if (!name || !Number.isInteger(version) || version < 1) return undefined
+
+  const generated = generateExam(name, version)
+  if (generated.examId !== examId) return undefined
+  saveExam(generated)
+  return generated
 }
 
 export function saveExam(exam: GeneratedExam): void {

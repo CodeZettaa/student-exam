@@ -1,7 +1,8 @@
 import { CodeBlock } from '../../components/CodeBlock'
 import { ExamHeader } from '../../components/ExamHeader'
 import { materializeExam } from '../../services/examGenerator'
-import { getExamById } from '../../services/examStorage'
+import { resolveSharedExam } from '../../services/examStorage'
+import { examSharePath } from '../../utils/examLinks'
 import { optionLetter } from '../../utils/format'
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -9,8 +10,13 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 export function AnswerKeyPage() {
   const { examId = '' } = useParams()
   const [searchParams] = useSearchParams()
+  const studentName = searchParams.get('n')
+  const version = searchParams.get('v')
   const autoPrint = searchParams.get('print') === '1'
-  const exam = useMemo(() => getExamById(examId), [examId])
+  const exam = useMemo(
+    () => resolveSharedExam(examId, studentName, version),
+    [examId, studentName, version],
+  )
   const materialized = useMemo(() => (exam ? materializeExam(exam) : null), [exam])
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export function AnswerKeyPage() {
         <Link to="/" className="btn btn-ghost">
           Instructor page
         </Link>
-        <Link to={`/exam/${meta.examId}?preview=1`} className="btn btn-ghost">
+        <Link to={examSharePath(meta, { preview: '1' })} className="btn btn-ghost">
           Preview student paper
         </Link>
         <button type="button" className="btn btn-primary" onClick={() => window.print()}>

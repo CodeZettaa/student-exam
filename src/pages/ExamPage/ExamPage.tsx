@@ -5,21 +5,27 @@ import { Instructions } from '../../components/Instructions'
 import { McqItem } from '../../components/McqItem'
 import { ProblemItem } from '../../components/ProblemItem'
 import { materializeExam } from '../../services/examGenerator'
-import { getAnswers, getExamById, getTimer, saveAnswers } from '../../services/examStorage'
+import { getAnswers, getTimer, resolveSharedExam, saveAnswers } from '../../services/examStorage'
 import type { ExamAnswers } from '../../types/exam'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 export function ExamPage() {
   const { examId = '' } = useParams()
-  return <ExamView key={examId} examId={examId} />
+  const [searchParams] = useSearchParams()
+  return <ExamView key={`${examId}:${searchParams.get('n')}:${searchParams.get('v')}`} examId={examId} />
 }
 
 function ExamView({ examId }: { examId: string }) {
   const [searchParams] = useSearchParams()
   const preview = searchParams.get('preview') === '1'
   const autoPrint = searchParams.get('print') === '1'
-  const exam = useMemo(() => getExamById(examId), [examId])
+  const studentName = searchParams.get('n')
+  const version = searchParams.get('v')
+  const exam = useMemo(
+    () => resolveSharedExam(examId, studentName, version),
+    [examId, studentName, version],
+  )
   const materialized = useMemo(() => (exam ? materializeExam(exam) : null), [exam])
   const [answers, setAnswers] = useState<ExamAnswers>(() => getAnswers(examId))
   const [started, setStarted] = useState(() => Boolean(getTimer(examId)))
@@ -44,7 +50,7 @@ function ExamView({ examId }: { examId: string }) {
     return (
       <div className="page-narrow">
         <h1>Exam not found</h1>
-        <p>This Exam ID is not stored in this browser. Generate it from the instructor page first.</p>
+        <p>This exam link is missing or invalid. Ask your instructor for the full student URL.</p>
         <Link to="/">Back to instructor page</Link>
       </div>
     )
