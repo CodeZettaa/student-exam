@@ -1,10 +1,10 @@
 import { AnswerTextarea } from './AnswerTextarea'
 import { CodeBlock } from './CodeBlock'
-import type { ExplainQuestion } from '../types/exam'
+import type { StudentExplainQuestion } from '../types/exam'
 
 interface ExplainItemProps {
   index: number
-  question: ExplainQuestion
+  question: StudentExplainQuestion
   value: string
   disabled: boolean
   onChange: (value: string) => void

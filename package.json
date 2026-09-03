@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run split:bank && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "validate:exams": "npx tsx src/scripts/validateExams.ts"
+    "validate:exams": "npx tsx src/scripts/validateExams.ts",
+    "split:bank": "npx tsx scripts/writeStudentBank.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.114.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3"

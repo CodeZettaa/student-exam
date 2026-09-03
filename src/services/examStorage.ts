@@ -1,6 +1,11 @@
 import { PREDEFINED_STUDENTS } from '../data/students'
-import { generateExam } from './examGenerator'
-import type { ExamAnswers, ExamTimerState, GeneratedExam } from '../types/exam'
+import type {
+  ExamAnswers,
+  ExamTimerState,
+  GeneratedExam,
+  LocalSubmissionState,
+  SubmissionStatus,
+} from '../types/exam'
 
 const STORAGE_KEY = 'js-diploma-exam-generator:v1'
 
@@ -9,6 +14,7 @@ interface ExamStore {
   extraStudents: string[]
   answersByExamId: Record<string, ExamAnswers>
   timersByExamId: Record<string, ExamTimerState>
+  submissionsByExamId: Record<string, LocalSubmissionState>
 }
 
 const emptyStore = (): ExamStore => ({
@@ -16,6 +22,7 @@ const emptyStore = (): ExamStore => ({
   extraStudents: [],
   answersByExamId: {},
   timersByExamId: {},
+  submissionsByExamId: {},
 })
 
 function readStore(): ExamStore {
@@ -28,6 +35,7 @@ function readStore(): ExamStore {
       extraStudents: parsed.extraStudents ?? [],
       answersByExamId: parsed.answersByExamId ?? {},
       timersByExamId: parsed.timersByExamId ?? {},
+      submissionsByExamId: parsed.submissionsByExamId ?? {},
     }
   } catch {
     return emptyStore()
@@ -59,22 +67,9 @@ export function getExamById(examId: string): GeneratedExam | undefined {
   return Object.values(store.examsByStudent).find((exam) => exam.examId === examId)
 }
 
-export function resolveSharedExam(
-  examId: string,
-  studentName: string | null,
-  versionParam: string | null,
-): GeneratedExam | undefined {
-  const stored = getExamById(examId)
-  if (stored) return stored
-
-  const name = studentName?.trim()
-  const version = Number(versionParam)
-  if (!name || !Number.isInteger(version) || version < 1) return undefined
-
-  const generated = generateExam(name, version)
-  if (generated.examId !== examId) return undefined
-  saveExam(generated)
-  return generated
+export function getExamByToken(token: string): GeneratedExam | undefined {
+  if (!token) return undefined
+  return Object.values(readStore().examsByStudent).find((exam) => exam.accessToken === token)
 }
 
 export function saveExam(exam: GeneratedExam): void {
@@ -92,6 +87,7 @@ export function replaceExam(previousExamId: string, next: GeneratedExam): void {
   const key = studentKey(next.studentName)
   delete store.answersByExamId[previousExamId]
   delete store.timersByExamId[previousExamId]
+  delete store.submissionsByExamId[previousExamId]
   store.examsByStudent[key] = next
   if (!PREDEFINED_STUDENTS.includes(next.studentName) && !store.extraStudents.includes(next.studentName)) {
     store.extraStudents.push(next.studentName)
@@ -100,7 +96,7 @@ export function replaceExam(previousExamId: string, next: GeneratedExam): void {
 }
 
 export function getAnswers(examId: string): ExamAnswers {
-    return (
+  return (
     readStore().answersByExamId[examId] ?? {
       examId,
       mcq: {},
@@ -125,12 +121,73 @@ export function getTimer(examId: string): ExamTimerState | undefined {
   return readStore().timersByExamId[examId]
 }
 
-export function startTimer(examId: string): ExamTimerState {
+export function startTimer(examId: string, startedAt = Date.now()): ExamTimerState {
   const store = readStore()
   const existing = store.timersByExamId[examId]
   if (existing) return existing
-  const timer = { examId, startedAt: Date.now() }
+  const timer = { examId, startedAt }
   store.timersByExamId[examId] = timer
   writeStore(store)
   return timer
+}
+
+export function getLocalSubmission(examId: string): LocalSubmissionState | undefined {
+  return readStore().submissionsByExamId[examId]
+}
+
+export function saveLocalSubmission(next: LocalSubmissionState): void {
+  const store = readStore()
+  store.submissionsByExamId[next.examId] = next
+  writeStore(store)
+}
+
+export function markLocalStarted(examId: string, startedAt?: string): LocalSubmissionState {
+  const current = getLocalSubmission(examId)
+  if (current && (current.status === 'submitted' || current.status === 'graded')) return current
+  const next: LocalSubmissionState = {
+    examId,
+    status: 'in_progress',
+    startedAt: current?.startedAt ?? startedAt ?? new Date().toISOString(),
+  }
+  saveLocalSubmission(next)
+  return next
+}
+
+export function markLocalSubmitted(
+  examId: string,
+  timedOut = false,
+  submittedAt = new Date().toISOString(),
+): LocalSubmissionState {
+  const current = getLocalSubmission(examId)
+  if (current && (current.status === 'submitted' || current.status === 'graded')) return current
+  const next: LocalSubmissionState = {
+    examId,
+    status: 'submitted',
+    startedAt: current?.startedAt,
+    submittedAt: current?.submittedAt ?? submittedAt,
+    timedOut: current?.timedOut || timedOut,
+  }
+  saveLocalSubmission(next)
+  return next
+}
+
+export function isLocallySubmitted(examId: string): boolean {
+  const status = getLocalSubmission(examId)?.status
+  return status === 'submitted' || status === 'graded'
+}
+
+export function mergeRemoteSubmissionStatus(
+  examId: string,
+  status: SubmissionStatus,
+  startedAt?: string | null,
+  submittedAt?: string | null,
+  timedOut?: boolean,
+): void {
+  saveLocalSubmission({
+    examId,
+    status,
+    startedAt: startedAt ?? undefined,
+    submittedAt: submittedAt ?? undefined,
+    timedOut,
+  })
 }

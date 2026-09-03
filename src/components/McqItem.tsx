@@ -1,10 +1,10 @@
 import { CodeBlock } from './CodeBlock'
 import { optionLetter } from '../utils/format'
-import type { MaterializedMcq } from '../services/examGenerator'
+import type { StudentMaterializedMcq } from '../services/studentExam'
 
 interface McqItemProps {
   index: number
-  item: MaterializedMcq
+  item: StudentMaterializedMcq
   selectedOriginalIndex: number | undefined
   disabled: boolean
   onChange: (originalIndex: number) => void

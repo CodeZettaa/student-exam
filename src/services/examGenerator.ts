@@ -11,6 +11,7 @@ import type {
 } from '../types/exam'
 import { MCQ_COUNT, EXPLAIN_COUNT, PROBLEM_COUNT } from '../types/exam'
 import { createSeededRng, makeExamId, range, shuffledCopy, type Rng } from '../utils/rng'
+import { createAccessToken } from '../utils/tokens'
 
 const MCQ_DIFFICULTY_PLAN: Record<Difficulty, number> = {
   easy: 5,
@@ -183,6 +184,7 @@ export function generateExam(studentName: string, version: number): GeneratedExa
     })),
     explainIds: explain.map((question) => question.id),
     problemId: problem.id,
+    accessToken: createAccessToken(),
   }
 }
 

@@ -16,3 +16,10 @@ export function formatDuration(totalSeconds: number): string {
 export function optionLetter(index: number): string {
   return String.fromCharCode(65 + index)
 }
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString()
+}

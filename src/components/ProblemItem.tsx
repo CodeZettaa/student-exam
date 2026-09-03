@@ -1,8 +1,8 @@
 import { AnswerTextarea } from './AnswerTextarea'
-import type { ProblemQuestion } from '../types/exam'
+import type { StudentProblemQuestion } from '../types/exam'
 
 interface ProblemItemProps {
-  question: ProblemQuestion
+  question: StudentProblemQuestion
   value: string
   disabled: boolean
   onChange: (value: string) => void

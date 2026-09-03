@@ -1,10 +1,12 @@
 import { CodeBlock } from '../../components/CodeBlock'
 import { ExamHeader } from '../../components/ExamHeader'
 import { materializeExam } from '../../services/examGenerator'
-import { resolveSharedExam } from '../../services/examStorage'
+import { adminGetExamByExamId } from '../../services/examApi'
+import { resolveSharedExam } from '../../services/examResolver'
 import { examSharePath } from '../../utils/examLinks'
 import { optionLetter } from '../../utils/format'
-import { useEffect, useMemo } from 'react'
+import type { GeneratedExam } from '../../types/exam'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 export function AnswerKeyPage() {
@@ -13,10 +15,26 @@ export function AnswerKeyPage() {
   const studentName = searchParams.get('n')
   const version = searchParams.get('v')
   const autoPrint = searchParams.get('print') === '1'
-  const exam = useMemo(
-    () => resolveSharedExam(examId, studentName, version),
-    [examId, studentName, version],
+  const [exam, setExam] = useState<GeneratedExam | null>(
+    () => resolveSharedExam(examId, studentName, version) ?? null,
   )
+  const [loading, setLoading] = useState(!exam)
+
+  useEffect(() => {
+    if (exam) return undefined
+    let active = true
+    void adminGetExamByExamId(examId)
+      .then((row) => {
+        if (active && row?.generated_questions) setExam(row.generated_questions)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [exam, examId])
+
   const materialized = useMemo(() => (exam ? materializeExam(exam) : null), [exam])
 
   useEffect(() => {
@@ -27,11 +45,19 @@ export function AnswerKeyPage() {
     return undefined
   }, [autoPrint, materialized])
 
+  if (loading && !materialized) {
+    return (
+      <div className="page-narrow">
+        <h1>Loading answer key</h1>
+      </div>
+    )
+  }
+
   if (!materialized) {
     return (
       <div className="page-narrow">
         <h1>Answer key not found</h1>
-        <Link to="/">Back to instructor page</Link>
+        <Link to="/admin">Back to instructor page</Link>
       </div>
     )
   }
@@ -42,7 +68,7 @@ export function AnswerKeyPage() {
     <div className="exam-sheet answer-key" data-exam-id={meta.examId}>
       <div className="preview-banner no-print">Instructor answer key — do not share this page with students.</div>
       <div className="no-print toolbar">
-        <Link to="/" className="btn btn-ghost">
+        <Link to="/admin" className="btn btn-ghost">
           Instructor page
         </Link>
         <Link to={examSharePath(meta, { preview: '1' })} className="btn btn-ghost">
