@@ -28,6 +28,7 @@ import {
 } from '../../services/examStorage'
 import { fromSubmissionAnswers, toSubmissionAnswers } from '../../services/answerPayload'
 import { materializeStudentExam, type StudentMaterializedExam } from '../../services/studentExam'
+import { resolveSharedExam } from '../../services/examResolver'
 import type { ExamAnswers, GeneratedExam, SaveStatus as SaveStatusValue } from '../../types/exam'
 import { isFinalStatus } from '../../utils/tokens'
 import { isSupabaseConfigured } from '../../lib/supabase'
@@ -41,7 +42,7 @@ export function ExamPage() {
   const [searchParams] = useSearchParams()
   return (
     <ExamView
-      key={`${examId}:${searchParams.get('token')}:${searchParams.get('preview')}`}
+      key={`${examId}:${searchParams.get('token')}:${searchParams.get('n')}:${searchParams.get('v')}:${searchParams.get('preview')}`}
       examId={examId}
     />
   )
@@ -52,6 +53,8 @@ function ExamView({ examId }: { examId: string }) {
   const preview = searchParams.get('preview') === '1'
   const autoPrint = searchParams.get('print') === '1'
   const token = searchParams.get('token')?.trim() ?? ''
+  const studentName = searchParams.get('n')
+  const version = searchParams.get('v')
   const [loading, setLoading] = useState(() => !(preview && Boolean(getExamById(examId))))
   const [error, setError] = useState('')
   const [exam, setExam] = useState<GeneratedExam | null>(() =>
@@ -105,18 +108,20 @@ function ExamView({ examId }: { examId: string }) {
         setLoading(false)
         return
       }
-      if (!token) {
+      if (!token && !studentName) {
         setError('This exam link is missing an access token. Ask your instructor for the unique student URL.')
         setLoading(false)
         return
       }
 
       try {
-        const remoteExam = isSupabaseConfigured() ? await studentGetExam(token) : null
-        const localExam =
-          getExamByToken(token) ??
-          (getExamById(examId)?.accessToken === token ? getExamById(examId) : undefined)
-        const nextExam = remoteExam?.generated_questions ?? localExam ?? null
+        const remoteExam = token && isSupabaseConfigured() ? await studentGetExam(token) : null
+        const localExam = token
+          ? getExamByToken(token) ??
+            (getExamById(examId)?.accessToken === token ? getExamById(examId) : undefined)
+          : undefined
+        const reconstructed = resolveSharedExam(examId, studentName, version, token || null)
+        const nextExam = remoteExam?.generated_questions ?? localExam ?? reconstructed ?? null
         if (!active) return
         const remoteExamId = remoteExam?.exam_id ?? nextExam?.examId
         if (!nextExam || remoteExamId !== examId) {
@@ -132,7 +137,7 @@ function ExamView({ examId }: { examId: string }) {
 
         const localAnswers = getAnswers(examId)
         const localSubmission = getLocalSubmission(examId)
-        const remoteSubmission = isSupabaseConfigured() ? await studentGetSubmission(token) : null
+        const remoteSubmission = token && isSupabaseConfigured() ? await studentGetSubmission(token) : null
         if (!active) return
 
         if (remoteSubmission) {
@@ -184,7 +189,7 @@ function ExamView({ examId }: { examId: string }) {
     return () => {
       active = false
     }
-  }, [examId, preview, token])
+  }, [examId, preview, studentName, token, version])
 
   useEffect(() => {
     if (autoPrint && materialized) {

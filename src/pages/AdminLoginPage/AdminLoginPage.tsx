@@ -55,6 +55,10 @@ export function AdminLoginPage() {
       <p className="exam-kicker">Instructor access</p>
       <h1>Admin login</h1>
       <p className="hint">Only authenticated instructors can open the dashboard, submissions, and answer keys.</p>
+      <p className="hint">
+        Use the Project URL and the <strong>anon public</strong> key that starts with <code>eyJ</code> from
+        Supabase → Settings → API. Restart the app after changing <code>.env</code>.
+      </p>
       <form className="login-form" onSubmit={(event) => void handleSubmit(event)}>
         <label>
           Email

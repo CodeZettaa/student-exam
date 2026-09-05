@@ -95,20 +95,26 @@ export function AdminPage() {
   }
 
   const handleCopyLink = async (exam: GeneratedExam) => {
+    let saveError = ''
     try {
       await adminUpsertExam(exam)
     } catch (error) {
-      setMessage(
-        `Student link was not copied. Save to Supabase failed: ${error instanceof Error ? error.message : 'unknown error'}`,
-      )
-      return
+      saveError = error instanceof Error ? error.message : 'unknown error'
     }
     const url = examShareUrl(exam)
     try {
       await navigator.clipboard.writeText(url)
-      setMessage(`Student link copied and verified: ${url}`)
+      setMessage(
+        saveError
+          ? `Student link copied: ${url} Supabase is not saving yet (${saveError}). Copy .env.example to .env, add your project URL and anon key, restart the app, then copy again before sending to another browser.`
+          : `Student link copied and verified: ${url}`,
+      )
     } catch {
-      setMessage(`Copy this verified student link: ${url}`)
+      setMessage(
+        saveError
+          ? `Copy this student link: ${url} Save failed: ${saveError}`
+          : `Copy this verified student link: ${url}`,
+      )
     }
   }
 
@@ -216,7 +222,7 @@ export function AdminPage() {
           </p>
         ) : null}
         {message ? (
-          <p className={`notice ${message.includes('Do not send') || message.includes('not copied') ? 'danger' : 'success'}`}>
+          <p className={`notice ${message.includes('not saving') || message.includes('Save failed') || message.includes('Do not send') ? 'danger' : 'success'}`}>
             {message}
           </p>
         ) : null}

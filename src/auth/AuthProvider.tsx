@@ -52,8 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn: async (email, password) => {
         const supabase = getSupabase()
         if (!supabase) return 'Supabase is not configured.'
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        return error?.message ?? null
+        try {
+          const { error } = await supabase.auth.signInWithPassword({ email, password })
+          if (!error) return null
+          if (/failed to fetch/i.test(error.message)) {
+            return 'Cannot reach Supabase. Check VITE_SUPABASE_URL in .env (Project Settings → API → Project URL). Use the anon/public key that starts with eyJ, not sb_publishable_. Restart npm run dev after saving .env.'
+          }
+          return error.message
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Sign in failed'
+          if (/failed to fetch|networkerror|load failed/i.test(message)) {
+            return 'Cannot reach Supabase. The project URL in .env is wrong or the project is paused. Copy the Project URL and the anon JWT key (starts with eyJ) from Supabase → Project Settings → API, then restart the app.'
+          }
+          return message
+        }
       },
       signOut: async () => {
         const supabase = getSupabase()

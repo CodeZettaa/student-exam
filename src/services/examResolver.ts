@@ -6,6 +6,7 @@ export function resolveSharedExam(
   examId: string,
   studentName: string | null,
   versionParam: string | null,
+  accessToken?: string | null,
 ): GeneratedExam | undefined {
   const stored = getExamById(examId)
   if (stored) return stored
@@ -16,6 +17,7 @@ export function resolveSharedExam(
 
   const generated = generateExam(name, version)
   if (generated.examId !== examId) return undefined
+  if (accessToken) generated.accessToken = accessToken
   saveExam(generated)
   return generated
 }

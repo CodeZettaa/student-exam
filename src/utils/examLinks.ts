@@ -2,6 +2,8 @@ import type { GeneratedExam } from '../types/exam'
 
 export function examSharePath(exam: GeneratedExam, extra: Record<string, string> = {}): string {
   const params = new URLSearchParams()
+  params.set('n', exam.studentName)
+  params.set('v', String(exam.version))
   if (exam.accessToken && extra.preview !== '1') {
     params.set('token', exam.accessToken)
   }
@@ -13,9 +15,6 @@ export function examSharePath(exam: GeneratedExam, extra: Record<string, string>
 }
 
 export function examShareUrl(exam: GeneratedExam): string {
-  if (exam.accessToken) {
-    return `${window.location.origin}/exam/${exam.examId}?token=${exam.accessToken}`
-  }
   return `${window.location.origin}${examSharePath(exam)}`
 }
 
