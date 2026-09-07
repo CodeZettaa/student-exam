@@ -26,10 +26,21 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       </nav>
       {!configured ? (
         <div className="setup-banner no-print">
-          <strong>Supabase is not configured.</strong> Copy <code>.env.example</code> to <code>.env</code>,
-          set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>, run{' '}
-          <code>supabase/schema.sql</code>, then restart the app. Until then, student links still copy and
-          open from the name in the URL, but answers will not save to the cloud.
+          <strong>Supabase is not configured on this site.</strong>{' '}
+          {window.location.hostname.includes('vercel.app') ? (
+            <>
+              In Vercel → Project Settings → Environment Variables, add{' '}
+              <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (use the anon JWT
+              that starts with <code>eyJ</code>), then Redeploy. Vite bakes these in at build time.
+            </>
+          ) : (
+            <>
+              Copy <code>.env.example</code> to <code>.env</code>, set <code>VITE_SUPABASE_URL</code> and{' '}
+              <code>VITE_SUPABASE_ANON_KEY</code>, run <code>supabase/schema.sql</code>, then restart the
+              app.
+            </>
+          )}{' '}
+          Until then, copied student links can open the paper, but answers will not save to the cloud.
         </div>
       ) : null}
       {children}

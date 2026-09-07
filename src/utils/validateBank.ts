@@ -132,7 +132,7 @@ export function validateGeneratedClass(): string[] {
   }
 
   const avgOverlap = overlaps.reduce((sum, n) => sum + n, 0) / overlaps.length
-  logs.push(`20 student exams generated with unique question sets`)
+  logs.push(`${PREDEFINED_STUDENTS.length} student exams generated with unique question sets`)
   logs.push(`Average MCQ overlap between students: ${(avgOverlap * 100).toFixed(1)}%`)
   logs.push(`Unique exam IDs: ${examIds.size}`)
   return logs

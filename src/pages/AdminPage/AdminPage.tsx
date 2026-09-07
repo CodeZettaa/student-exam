@@ -2,7 +2,7 @@ import { StudentTable } from '../../components/StudentTable'
 import { AdminLayout } from '../../components/AdminLayout'
 import { AdminSummary } from '../../components/AdminSummary'
 import { generateExam } from '../../services/examGenerator'
-import { adminReplaceExam, adminUpsertExam } from '../../services/examApi'
+import { adminListExams, adminReplaceExam, adminUpsertExam } from '../../services/examApi'
 import {
   getExamForStudent,
   listStudents,
@@ -13,7 +13,8 @@ import {
 import { useDashboardStats } from '../../hooks/useDashboardStats'
 import type { GeneratedExam } from '../../types/exam'
 import { answerKeyPath, examSharePath, examShareUrl } from '../../utils/examLinks'
-import { useMemo, useState } from 'react'
+import { normalizeGeneratedExam } from '../../services/examPayload'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 function loadExamMap(students: string[]): Record<string, GeneratedExam> {
@@ -25,6 +26,24 @@ function loadExamMap(students: string[]): Record<string, GeneratedExam> {
   return map
 }
 
+async function hydrateAssignedExams(): Promise<void> {
+  const rows = await adminListExams()
+  for (const row of rows) {
+    const generated = normalizeGeneratedExam(
+      row.generated_questions,
+      row.exam_id,
+      row.student_name,
+      row.exam_version,
+    )
+    if (!generated) continue
+    if (getExamForStudent(generated.studentName)) continue
+    saveExam({
+      ...generated,
+      accessToken: generated.accessToken ?? row.access_token,
+    })
+  }
+}
+
 export function AdminPage() {
   const navigate = useNavigate()
   const [nameInput, setNameInput] = useState('')
@@ -32,10 +51,15 @@ export function AdminPage() {
   const [students, setStudents] = useState(listStudents)
   const [exams, setExams] = useState(() => loadExamMap(listStudents()))
   const [message, setMessage] = useState('')
+  const [generatingRemaining, setGeneratingRemaining] = useState(false)
   const { stats, loading: statsLoading } = useDashboardStats()
 
   const assignedCount = useMemo(
     () => students.filter((name) => exams[name]).length,
+    [students, exams],
+  )
+  const unassignedStudents = useMemo(
+    () => students.filter((name) => !exams[name]),
     [students, exams],
   )
 
@@ -45,7 +69,72 @@ export function AdminPage() {
     setExams(loadExamMap(nextStudents))
   }
 
+  useEffect(() => {
+    let active = true
+    void hydrateAssignedExams()
+      .then(() => {
+        if (active) refresh()
+      })
+      .catch(() => {
+        if (active) refresh()
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
   const resolveName = () => nameInput.trim() || selected.trim()
+
+  const handleGenerateRemaining = async () => {
+    if (generatingRemaining) return
+    const missing = students.filter((name) => !getExamForStudent(name))
+    if (!missing.length) {
+      setMessage('Every student on the list already has an exam. Existing papers were left unchanged.')
+      return
+    }
+    setGeneratingRemaining(true)
+    const saved: string[] = []
+    const localOnly: string[] = []
+    try {
+      try {
+        await hydrateAssignedExams()
+      } catch {
+        // Continue with locally assigned exams if Supabase is unavailable.
+      }
+      const currentStudents = listStudents()
+      const alreadyAssigned = currentStudents.filter((name) => getExamForStudent(name)).length
+      const remaining = currentStudents.filter((name) => !getExamForStudent(name))
+      if (!remaining.length) {
+        refresh()
+        setMessage('Every student on the list already has an exam. Existing papers were left unchanged.')
+        return
+      }
+      for (const name of remaining) {
+        if (getExamForStudent(name)) continue
+        const exam = generateExam(name, 1)
+        saveExam(exam)
+        try {
+          await adminUpsertExam(exam)
+          saved.push(name)
+        } catch {
+          localOnly.push(name)
+        }
+      }
+      refresh()
+      const created = saved.length + localOnly.length
+      if (localOnly.length) {
+        setMessage(
+          `Created ${created} new exam${created === 1 ? '' : 's'} for unassigned students. Existing papers were not changed. ${localOnly.length} could not be saved to Supabase — do not send those links yet.`,
+        )
+        return
+      }
+      setMessage(
+        `Created ${created} new exam${created === 1 ? '' : 's'} for unassigned students. The ${alreadyAssigned} existing paper${alreadyAssigned === 1 ? '' : 's'} were left unchanged.`,
+      )
+    } finally {
+      setGeneratingRemaining(false)
+    }
+  }
 
   const handleGenerate = async (name: string) => {
     const studentName = name.trim()
@@ -102,11 +191,16 @@ export function AdminPage() {
       saveError = error instanceof Error ? error.message : 'unknown error'
     }
     const url = examShareUrl(exam)
+    const vercelHint =
+      'This Vercel deploy has no Supabase keys. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel → Settings → Environment Variables (anon JWT starting with eyJ), then Redeploy.'
+    const localHint =
+      'Copy .env.example to .env, add your project URL and anon JWT key (starts with eyJ), restart the app, then copy again before sending to another browser.'
+    const setupHint = window.location.hostname.includes('vercel.app') ? vercelHint : localHint
     try {
       await navigator.clipboard.writeText(url)
       setMessage(
         saveError
-          ? `Student link copied: ${url} Supabase is not saving yet (${saveError}). Copy .env.example to .env, add your project URL and anon key, restart the app, then copy again before sending to another browser.`
+          ? `Student link copied: ${url} Supabase is not saving yet (${saveError}). ${setupHint}`
           : `Student link copied and verified: ${url}`,
       )
     } catch {
@@ -171,6 +265,18 @@ export function AdminPage() {
             >
               Generate Exam
             </button>
+            {unassignedStudents.length ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={generatingRemaining}
+                onClick={() => void handleGenerateRemaining()}
+              >
+                {generatingRemaining
+                  ? 'Generating remaining…'
+                  : `Generate remaining (${unassignedStudents.length})`}
+              </button>
+            ) : null}
             {activeExam ? (
               <>
                 <button
@@ -228,8 +334,10 @@ export function AdminPage() {
         ) : null}
         <p className="hint">
           Replace names in <code>src/data/students.ts</code> with your real roster. Custom names typed
-          here are kept in this browser. Use <strong>Copy student link</strong> to share the exam — the
-          URL includes a unique token, not just the student name.
+          here are kept in this browser. Use <strong>Generate remaining</strong> to create papers only
+          for students who do not have one yet — existing exams and student links stay unchanged. Use{' '}
+          <strong>Copy student link</strong> to share the exam — the URL includes a unique token, not
+          just the student name.
         </p>
       </section>
 
